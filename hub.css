@@ -1,0 +1,16 @@
+/* hub.css - rules that belong to the hub and nowhere else.
+   Loaded after style.css, which is a vendored byte-identical copy of
+   drakes-website/style.css and must never be edited here. Every hub-only rule
+   goes in this file so the drift check on the vendored copy stays binary. */
+
+/* the empty state, and whatever the generator leaves behind when the last post
+   is pulled. Sits where a post row would sit, reads as absence, not an error. */
+.posts .empty {
+  color: var(--muted);
+  font-style: italic;
+  margin: 0;
+  padding: 9px 2px;
+}
+
+/* button rows on the hub sit next to each other rather than stacking */
+.btn + .btn { margin-left: 6px; }
