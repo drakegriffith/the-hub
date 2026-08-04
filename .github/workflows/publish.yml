@@ -48,6 +48,9 @@ jobs:
               headers={
                   "Authorization": "Bearer " + os.environ["PUBLISH_EXPORT_SECRET"],
                   "Content-Type": "application/json",
+                  # urllib's default UA fails Cloudflare's Browser Integrity
+                  # Check with a 403 (error 1010) before the Worker runs.
+                  "User-Agent": "the-hub-publish-action",
               },
               method="POST",
           )
@@ -117,6 +120,7 @@ jobs:
                   headers={
                       "Authorization": "Bearer " + os.environ["PUBLISH_EXPORT_SECRET"],
                       "Content-Type": "application/json",
+                      "User-Agent": "the-hub-publish-action",
                   },
                   method="POST",
               )
