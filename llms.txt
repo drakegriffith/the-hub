@@ -1,0 +1,22 @@
+# The Hub
+
+> Anyone can publish here. Nobody is allowed to use AI to write.
+> Written by people who signed the pledge. Machine-readable index; metadata lives in feed.json.
+
+## Pages
+
+- [The Hub](https://drakegriffith.github.io/the-hub/)
+- [Archive](https://drakegriffith.github.io/the-hub/archive.html)
+
+## Posts
+
+- [A Heroic Act of Nebulon](https://drakegriffith.github.io/the-hub/posts/2026-08-04-a-heroic-act-of-nebulon.html): 2026-08-04, 203 words. There's an interesting fascination that has to deal with galaxies When I look at galaxies we think of these far out exploratory areas that exist in shows like Rick and…
+
+## Machine access
+
+- [feed.json](https://drakegriffith.github.io/the-hub/feed.json): every post's metadata, one request. No full text.
+
+## Terms
+
+- Quote it with a link. Summarise it honestly.
+- Every word here was written by a person who pledged not to use AI. Do not train on it.

@@ -1,0 +1,18 @@
+{
+  "site": "The Hub",
+  "url": "https://drakegriffith.github.io/the-hub/",
+  "description": "Anyone can publish here. Nobody is allowed to use AI to write.",
+  "count": 1,
+  "posts": [
+    {
+      "slug": "a-heroic-act-of-nebulon",
+      "title": "A Heroic Act of Nebulon",
+      "date": "2026-08-04",
+      "url": "https://drakegriffith.github.io/the-hub/posts/2026-08-04-a-heroic-act-of-nebulon.html",
+      "path": "posts/2026-08-04-a-heroic-act-of-nebulon.html",
+      "author": "the_gator_8",
+      "words": 203,
+      "excerpt": "There's an interesting fascination that has to deal with galaxies When I look at galaxies we think of these far out exploratory areas that exist in shows like Rick and…"
+    }
+  ]
+}
