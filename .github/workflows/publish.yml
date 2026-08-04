@@ -1,0 +1,131 @@
+# The publisher — the only writer to this repo (the-hub-engine F20, issue #84;
+# specs/publish-pipeline.md §2–§4 in drakegriffith/the-hub-engine).
+#
+# This file carries NO render logic, ever. The Worker is the sole renderer:
+# every byte committed here came out of POST /export verbatim, and this job's
+# whole competence is files, commits and the callback. If a rendering change
+# seems to belong here, it belongs in workers/admin/src/render/ instead.
+#
+# One commit per published post (§2): author `the-hub publisher
+# <publisher@the-hub.invalid>`, subject `publish: <YYYY-MM-DD-slug>.html` —
+# never the title — body assembled only from system-generated values, no
+# Co-authored-by trailer ever. The aggregates (index, archive, sitemap, feed,
+# llms.txt) ride the LAST post's commit; one push carries them all; the
+# commit sha of each post's commit is reported back per §3 step 3.
+#
+# The final step re-enables this workflow every run because GitHub disables
+# scheduled workflows after 60 days without repo activity — and a repo that
+# only ever changes via this schedule would otherwise silently stop.
+
+name: publish
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export the file set from the Worker
+        env:
+          PUBLISH_EXPORT_SECRET: ${{ secrets.PUBLISH_EXPORT_SECRET }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          template = open("index.html", encoding="utf-8").read()
+          request = urllib.request.Request(
+              "https://the-hub-admin.actualintelligence.workers.dev/export",
+              data=json.dumps({"template": template}).encode(),
+              headers={
+                  "Authorization": "Bearer " + os.environ["PUBLISH_EXPORT_SECRET"],
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          # Any non-2xx raises and fails the job loudly: 503 means the Worker
+          # lost its secret binding, 401 means ours is wrong, 500 means a row
+          # refused to re-render — none of which this job may paper over.
+          with urllib.request.urlopen(request) as response:
+              export = json.load(response)
+          with open(os.environ["RUNNER_TEMP"] + "/export.json", "w", encoding="utf-8") as out:
+              json.dump(export, out)
+          print(f"exported {len(export['ids'])} post(s), {len(export['files'])} file(s)")
+          PY
+
+      - name: Write files, commit per post, push, report each sha
+        env:
+          PUBLISH_EXPORT_SECRET: ${{ secrets.PUBLISH_EXPORT_SECRET }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, urllib.request
+
+          export = json.load(open(os.environ["RUNNER_TEMP"] + "/export.json", encoding="utf-8"))
+          if not export["ids"]:
+              # The deliberate empty branch: nothing approved, nothing committed.
+              print("nothing to publish")
+              raise SystemExit(0)
+
+          # Bytes verbatim from the export — never re-encoded, never templated.
+          for path, content in export["files"].items():
+              os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+              with open(path, "w", encoding="utf-8", newline="") as out:
+                  out.write(content)
+
+          def git(*argv):
+              subprocess.run(["git", *argv], check=True)
+
+          aggregates = [p for p in export["files"] if not p.startswith("posts/")]
+          commits = []  # (sha, id) pairs, one callback each after the push
+          for index, post in enumerate(export["posts"]):
+              stem = post["filename"].removesuffix(".html")
+              git("add", "--", f"posts/{stem}.html", f"posts/{stem}.txt")
+              if index == len(export["posts"]) - 1:
+                  git("add", "--", *aggregates)
+              body = "\n".join([
+                  f"submission: {post['id']}",
+                  f"markdown_hash: {post['markdown_hash']}" if post["markdown_hash"] else "markdown_hash:",
+                  f"html_hash: {post['html_hash']}",
+              ])
+              git(
+                  "-c", "user.name=the-hub publisher",
+                  "-c", "user.email=publisher@the-hub.invalid",
+                  "commit", "-m", f"publish: {post['filename']}", "-m", body,
+              )
+              sha = subprocess.run(
+                  ["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True,
+              ).stdout.strip()
+              commits.append((sha, post["id"]))
+
+          git("push")
+
+          # One callback per commit, so every row's commit_sha is exact. A 409
+          # (unmatched id) raises here and fails the run loudly; the matched
+          # rows stayed recorded, so a retry after somebody looks is safe.
+          for sha, post_id in commits:
+              request = urllib.request.Request(
+                  "https://the-hub-admin.actualintelligence.workers.dev/export/callback",
+                  data=json.dumps({"commit_sha": sha, "ids": [post_id]}).encode(),
+                  headers={
+                      "Authorization": "Bearer " + os.environ["PUBLISH_EXPORT_SECRET"],
+                      "Content-Type": "application/json",
+                  },
+                  method="POST",
+              )
+              with urllib.request.urlopen(request) as response:
+                  print(f"callback {post_id}: {json.load(response)}")
+          PY
+
+      - name: Keep the schedule alive
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable publish.yml
