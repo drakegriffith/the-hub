@@ -13,6 +13,11 @@
 # llms.txt) ride the LAST post's commit; one push carries them all; the
 # commit sha of each post's commit is reported back per §3 step 3.
 #
+# bans.html (F13, issue #92) rides every export, posts or none. It gets its
+# own commit, subject `publish: bans.html`, ONLY when its bytes differ from
+# the checkout — `git log bans.html` is the audit trail of every ban and
+# reversal, and a byte-identical rewrite would bury it in noise.
+#
 # The final step re-enables this workflow every run because GitHub disables
 # scheduled workflows after 60 days without repo activity — and a repo that
 # only ever changes via this schedule would otherwise silently stop.
@@ -77,9 +82,43 @@ jobs:
           import json, os, subprocess, urllib.request
 
           export = json.load(open(os.environ["RUNNER_TEMP"] + "/export.json", encoding="utf-8"))
+
+          def git(*argv):
+              subprocess.run(["git", *argv], check=True)
+
+          # bans.html is not a per-post file and not an aggregate: it gets its
+          # own commit, and only when its bytes differ. Popped here so the
+          # per-post loop below never sweeps it into a post's commit.
+          bans_html = export["files"].pop("bans.html", None)
+
+          def commit_bans_if_changed():
+              if bans_html is None:
+                  # A Worker predating F13 sends no bans.html; say so and move on.
+                  print("export carried no bans.html")
+                  return False
+              with open("bans.html", "w", encoding="utf-8", newline="") as out:
+                  out.write(bans_html)
+              git("add", "--", "bans.html")
+              unchanged = subprocess.run(
+                  ["git", "diff", "--cached", "--quiet", "--", "bans.html"],
+              ).returncode == 0
+              if unchanged:
+                  print("bans.html unchanged")
+                  return False
+              git(
+                  "-c", "user.name=the-hub publisher",
+                  "-c", "user.email=publisher@the-hub.invalid",
+                  "commit", "-m", "publish: bans.html",
+              )
+              return True
+
           if not export["ids"]:
-              # The deliberate empty branch: nothing approved, nothing committed.
-              print("nothing to publish")
+              # The deliberate empty branch: nothing approved, no post commit —
+              # but a ban recorded since the last run still lands.
+              if commit_bans_if_changed():
+                  git("push")
+              else:
+                  print("nothing to publish")
               raise SystemExit(0)
 
           # Bytes verbatim from the export — never re-encoded, never templated.
@@ -87,9 +126,6 @@ jobs:
               os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
               with open(path, "w", encoding="utf-8", newline="") as out:
                   out.write(content)
-
-          def git(*argv):
-              subprocess.run(["git", *argv], check=True)
 
           aggregates = [p for p in export["files"] if not p.startswith("posts/")]
           commits = []  # (sha, id) pairs, one callback each after the push
@@ -112,6 +148,10 @@ jobs:
                   ["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True,
               ).stdout.strip()
               commits.append((sha, post["id"]))
+
+          # After the per-post commits, bans.html on its own — one push
+          # still carries everything.
+          commit_bans_if_changed()
 
           git("push")
 
