@@ -16,6 +16,11 @@
 # The final step re-enables this workflow every run because GitHub disables
 # scheduled workflows after 60 days without repo activity — and a repo that
 # only ever changes via this schedule would otherwise silently stop.
+#
+# Scheduled runs are attributed to the last account that committed THIS file.
+# If that commit's email maps to no GitHub account, GitHub registers no cron
+# and fires nothing, silently (observed 2026-08-04: 80+ min, zero schedule
+# runs). Any edit to this file must land from a mapped account.
 
 name: publish
 
