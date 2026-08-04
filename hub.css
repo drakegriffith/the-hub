@@ -14,3 +14,15 @@
 
 /* button rows on the hub sit next to each other rather than stacking */
 .btn + .btn { margin-left: 6px; }
+
+/* the bans page (F13): the generator emits one .ban-box per ban inside .bans,
+   and .empty while the registry holds no bans. The .ban-box chrome itself is
+   vendored style.css; only the row internals and the empty state live here. */
+.bans .empty {
+  color: var(--muted);
+  font-style: italic;
+  margin: 0;
+  padding: 9px 2px;
+}
+.ban-who { margin: 0 0 6px 0; font-weight: bold; }
+.ban-reason { margin: 0; }
